@@ -10,10 +10,9 @@ import fs from "fs";
 const router = Router();
 const prisma = new PrismaClient();
 
-
-router.get("/resume",authMiddleware, async (req, res: Response) => {
+router.get("/resume/:studentId?",authMiddleware, async (req, res: Response) => {
   try {
-    const studentId = (req as any).user?.userId;
+ const studentId = req.params.studentId || (req as any).user.userId;
 
     const profile = await prisma.studentProfile.findUnique({
       where: { userId: studentId },
@@ -21,6 +20,7 @@ router.get("/resume",authMiddleware, async (req, res: Response) => {
 
     if (!profile || !profile.resumeUrl) {
       return res.status(404).json({
+        profile:profile,
         success: false,
         message: "Resume not found",
       });
@@ -30,6 +30,7 @@ router.get("/resume",authMiddleware, async (req, res: Response) => {
 
     if (!fs.existsSync(filePath)) {
       return res.status(404).json({
+        file:filePath,
         success: false,
         message: "File not found on server",
       });
@@ -48,20 +49,23 @@ router.get("/resume",authMiddleware, async (req, res: Response) => {
     console.error("Get resume error:", error);
     res.status(500).json({
       success: false,
-      message: "Internal server error",
+      message: "file size too large ",
     });
   }
 });
 
 
 
-router.get('/profile', authMiddleware, async (req: Request, res: Response) => {
+
+
+router.get('/profile/:studentId?', authMiddleware, async (req: Request, res: Response) => {
   try {
-      const userId = (req as any).user?.userId;
+    const studentId = req.params.studentId || (req as any).user.userId;
 
     const profile = await prisma.studentProfile.findUnique({
-  where: { userId: userId },
+  where: { userId: studentId },
   select: {
+    userId:true,
     name: true,
     email: true,
     phone: true,
@@ -87,7 +91,7 @@ router.get('/profile', authMiddleware, async (req: Request, res: Response) => {
     res.json({
       success: true,
       message: 'Profile retrieved successfully',
-      data: { profile }
+      data: {  profile }
     });
   } catch (error) {
     console.error('Profile retrieval error:', error);
@@ -103,7 +107,7 @@ router.post(
   "/profile",
   authMiddleware,
   roleMiddleware("STUDENT"),
-  upload.single("resume"), 
+  upload.single("resume"), // multer handles multipart/form-data
   validate(profileSchema.omit({ resumeUrl: true })), 
   async (req: Request, res: Response) => {
     try {
@@ -124,43 +128,15 @@ router.post(
 
       const profile = await prisma.studentProfile.upsert({
         where: { userId },
-        update: {
-          name,
-          email,
-          phone,
-          class: studentClass,
-          major,
-          year,
-          gpa,
-          skills,
-          bio,
-          resumeUrl,
-        },
-        create: {
-          userId,
-          name,
-          email,
-          phone,
-          class: studentClass,
-          major,
-          year,
-          gpa,
-          skills,
-          bio,
-          resumeUrl,
-        },
-        include: {
-          user: { select: { name: true } },
-        },
+        update: { name, email, phone, class: studentClass, major, year, gpa, skills, bio, resumeUrl },
+        create: { userId, name, email, phone, class: studentClass, major, year, gpa, skills, bio, resumeUrl },
+        include: { user: { select: { name: true } } },
       });
 
       res.json({
         success: true,
         message: "Profile updated successfully",
-        data: {
-          profile,
-          name: profile.user.name,
-        },
+        data: { profile, name: profile.user.name },
       });
     } catch (error) {
       console.error("Profile update error:", error);

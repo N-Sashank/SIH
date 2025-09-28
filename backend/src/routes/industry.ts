@@ -7,6 +7,8 @@ import { validate, internshipSchema, feedbackSchema } from '../middleware/valida
 const router = Router();
 const prisma = new PrismaClient();
 
+
+
 router.post('/internships', 
   authMiddleware, 
   roleMiddleware('INDUSTRY'), 
